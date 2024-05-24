@@ -1,5 +1,5 @@
 import React from "react";
-import { connect } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 
 import {
   TREZOR,
@@ -21,44 +21,37 @@ import {
   TextField,
   Button,
 } from "@mui/material";
-import * as keystoreActions from "../../actions/keystoreActions";
+import {
+  setKeystore as setKeystoreAction,
+  setKeystoreStatus as setKeystoreStatusAction,
+} from "../../actions/keystoreActions";
 import { setErrorNotification as setErrorNotificationAction } from "../../actions/errorNotificationActions";
+import { getKeystore } from "../../selectors/keystore";
 
 import { KeystoreNote } from "./Note";
 import InteractionMessages from "../InteractionMessages";
 
 const NO_VERSION_DETECTION = ["", ...Object.values(INDIRECT_KEYSTORES)];
 
-interface KeystorePickerBaseProps {
-  setErrorNotification: (message: string) => void;
-  setKeystore: (type: string, version: string) => void;
-  setKeystoreStatus: (status: string) => void;
-  status: string;
-  type: KEYSTORE_TYPES | "";
-  version: string;
-}
+const KeystorePicker = () => {
+  const type = useSelector(getKeystore).type;
+  const status = useSelector(getKeystore).status;
+  const version = useSelector(getKeystore).version;
+  const dispatch = useDispatch();
 
-const KeystorePickerBase = ({
-  type,
-  status,
-  version,
-  setErrorNotification,
-  setKeystoreStatus,
-  setKeystore,
-}: KeystorePickerBaseProps) => {
   const detectVersion = async () => {
-    setKeystoreStatus(ACTIVE);
+    dispatch(setKeystoreStatusAction(ACTIVE));
     try {
       const result = await interaction().run();
       if (result) {
-        setKeystore(type, result.spec);
+        dispatch(setKeystoreAction(type, result.spec));
       }
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error(e);
-      setErrorNotification(e.message);
+      dispatch(setErrorNotificationAction(e.message));
     }
-    setKeystoreStatus(PENDING);
+    dispatch(setKeystoreStatusAction(PENDING));
   };
 
   const interaction = () => {
@@ -66,13 +59,15 @@ const KeystorePickerBase = ({
   };
 
   const handleTypeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newType = event.target.value;
-    setKeystore(newType, version);
+    const newType = event.target.value as KEYSTORE_TYPES | "";
+    dispatch(setKeystoreAction(newType, version));
   };
 
   const handleVersionChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newVersion = event.target.value;
-    setKeystore(type, newVersion);
+    if (type) {
+      dispatch(setKeystoreAction(type, newVersion));
+    }
   };
 
   return (
@@ -129,21 +124,5 @@ const KeystorePickerBase = ({
     </Box>
   );
 };
-
-const mapStateToProps = (state: { keystore: KeystorePickerBaseProps }) => {
-  return {
-    ...state.keystore,
-  };
-};
-
-const mapDispatchToProps = {
-  ...keystoreActions,
-  setErrorNotification: setErrorNotificationAction,
-};
-
-const KeystorePicker = connect(
-  mapStateToProps,
-  mapDispatchToProps,
-)(KeystorePickerBase);
 
 export default KeystorePicker;

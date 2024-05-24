@@ -43,7 +43,7 @@ import { getTestSuiteRun } from "../../selectors/testSuiteRun";
 
 import "./TestSuiteRunSummary.css";
 
-const TestSuiteRunSummaryBase = () => {
+const TestSuiteRunSummary = () => {
   const keystore = useSelector(getKeystore);
   const testSuiteRun = useSelector(getTestSuiteRun);
   const dispatch = useDispatch();
@@ -244,4 +244,4 @@ const TestSuiteRunSummaryBase = () => {
   );
 };
 
-export default TestSuiteRunSummaryBase;
+export default TestSuiteRunSummary;

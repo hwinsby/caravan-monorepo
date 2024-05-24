@@ -1,18 +1,12 @@
-import { TREZOR, LEDGER, HERMIT, COLDCARD } from "@caravan/wallets";
+import { KEYSTORE_TYPES } from "@caravan/wallets";
 
 export const SET_KEYSTORE = "SET_KEYSTORE";
 export const SET_KEYSTORE_NOTE = "SET_KEYSTORE_NOTE";
 export const SET_KEYSTORE_STATUS = "SET_KEYSTORE_STATUS";
 
-type KeyStoreType =
-  | typeof TREZOR
-  | typeof LEDGER
-  | typeof HERMIT
-  | typeof COLDCARD;
-
 export type SetKeystoreAction = {
   type: typeof SET_KEYSTORE;
-  keystoreType: KeyStoreType | "";
+  keystoreType: KEYSTORE_TYPES | "";
   version: string;
 };
 
@@ -32,7 +26,7 @@ export type KeystoreActionTypes =
   | SetKeystoreStatusAction;
 
 export function setKeystore(
-  keystoreType: KeyStoreType,
+  keystoreType: KEYSTORE_TYPES | "",
   version: string,
 ): SetKeystoreAction {
   return {

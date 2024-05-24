@@ -1,4 +1,4 @@
-import { PENDING } from "@caravan/wallets";
+import { KEYSTORE_TYPES, PENDING } from "@caravan/wallets";
 
 import {
   SET_KEYSTORE,
@@ -8,7 +8,7 @@ import {
 } from "../actions/keystoreActions";
 
 export interface KeystoreState {
-  type: string;
+  type: KEYSTORE_TYPES | "";
   version: string;
   note: string;
   status: string;

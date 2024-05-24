@@ -24,6 +24,23 @@ export interface TestRunState {
   message?: string;
   note?: string;
   test?: any;
+  // Shape borrowed from the propTypes in TestRun.jsx
+  // TODO: fu on this shape
+  // {
+  //   name: func;
+  //   description: func;
+  //   interaction: func;
+  //   params: {
+  //     format: string;
+  //     derivation: string;
+  //     extendedPublicKeys: [];
+  //   };
+  //   run: func;
+  //   runParse: func;
+  //   resolve: func;
+  //   postprocess: func;
+  //   unsignedTransaction: func;
+  // };
 }
 
 export interface TestSuiteRunState {

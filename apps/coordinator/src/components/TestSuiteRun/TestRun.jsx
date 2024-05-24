@@ -1,5 +1,5 @@
-import React from "react";
-import { connect } from "react-redux";
+import React, { useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import PropTypes from "prop-types";
 import {
   PENDING,
@@ -24,33 +24,43 @@ import {
   Error as ErrorIcon,
 } from "@mui/icons-material";
 import moment from "moment";
-import Test from "../../tests/Test";
-import * as testRunActions from "../../actions/testRunActions";
-import * as errorNotificationActions from "../../actions/errorNotificationActions";
-import InteractionMessages from "../InteractionMessages";
-import { TestRunNote } from "./Note";
-import { HermitReader, HermitDisplayer } from "../Hermit";
+import Test from "../../tests/Test.js";
+import {
+  startTestRun as startTestRunAction,
+  endTestRun as endTestRunAction,
+  resetTestRun as resetTestRunAction,
+} from "../../actions/testRunActions.ts";
+import { setErrorNotification as setErrorNotificationAction } from "../../actions/errorNotificationActions.ts";
+import InteractionMessages from "../InteractionMessages.jsx";
+import { TestRunNote } from "./Note.tsx";
+import { HermitReader, HermitDisplayer } from "../Hermit/index.js";
 import {
   ColdcardJSONReader,
   ColdcardPSBTReader,
   ColdcardSigningButtons,
-} from "../Coldcard";
+} from "../Coldcard/index.js";
 import "./TestRun.css";
-import { downloadFile } from "../../utils";
+import { downloadFile } from "../../utils/index.js";
+
+import { getKeystore } from "../../selectors/keystore.ts";
+import { getTestSuiteRun } from "../../selectors/testSuiteRun.ts";
 
 const SPACEBAR_CODE = 32;
 
-class TestRunBase extends React.Component {
-  componentDidMount = () => {
-    document.addEventListener("keydown", this.handleKeyDown);
-  };
+// interface TestRunProps {
+//   testRunIndex: number;
+//   isLastTest: boolean;
+//   nextTest: () => boolean;
+// }
 
-  componentWillUnmount = () => {
-    document.removeEventListener("keydown", this.handleKeyDown);
-  };
+const TestRun = ({ testRunIndex, isLastTest, nextTest }) => {
+  // const TestRun = ({ testRunIndex, isLastTest, nextTest }: TestRunProps) => {
+  const keystore = useSelector(getKeystore);
+  const { status, message, test } =
+    useSelector(getTestSuiteRun).testRuns[testRunIndex];
+  const dispatch = useDispatch();
 
-  handleKeyDown = (event) => {
-    const { status, isLastTest, nextTest } = this.props;
+  const handleKeyDown = (event) => {
     if (event.keyCode !== SPACEBAR_CODE) {
       return;
     }
@@ -62,14 +72,13 @@ class TestRunBase extends React.Component {
       return;
     }
     if (status === PENDING) {
-      this.start();
+      start();
     } else if (!isLastTest) {
       nextTest();
     }
   };
 
-  handleDownloadPSBTClick = () => {
-    const { test } = this.props;
+  const handleDownloadPSBTClick = () => {
     const interaction = test.interaction();
     const nameBits = test.name().split(" ");
     const body = interaction.request();
@@ -78,8 +87,7 @@ class TestRunBase extends React.Component {
     downloadFile(body, filename);
   };
 
-  handledDownloadWalletConfigClick = () => {
-    const { test } = this.props;
+  const handledDownloadWalletConfigClick = () => {
     const nameBits = test.name().split(" ");
     const name = `${nameBits[2].toLowerCase()}-${nameBits[1][0]}`;
     // FIXME - need to know firmware version and then set P2WSH-P2SH vs P2SH-P2WSH appropriately
@@ -102,111 +110,7 @@ Derivation: ${test.params.derivation}
     downloadFile(output, filename);
   };
 
-  render = () => {
-    const { test, testRunIndex, status, keystore } = this.props;
-    if (!test) {
-      return (
-        <Box>
-          <p>No test selected.</p>
-        </Box>
-      );
-    }
-    return (
-      <Box>
-        <Card>
-          <CardHeader
-            title={test.name()}
-            subheader={`Test ${testRunIndex + 1}`}
-          />
-          <CardContent>
-            {test.description()}
-            {keystore.type === COLDCARD && !test.unsignedTransaction && (
-              <Box align="center">
-                <ColdcardJSONReader
-                  interaction={test.interaction()}
-                  onReceive={this.startParse}
-                  onStart={this.start}
-                  setError={this.reset}
-                  isTest
-                />
-              </Box>
-            )}
-            {keystore.type === COLDCARD && test.unsignedTransaction && (
-              <Box align="center" style={{ marginTop: "2em" }}>
-                <ColdcardSigningButtons
-                  handlePSBTDownloadClick={this.handleDownloadPSBTClick}
-                  handleWalletConfigDownloadClick={
-                    this.handledDownloadWalletConfigClick
-                  }
-                />
-                <ColdcardPSBTReader
-                  interaction={test.interaction()}
-                  onReceivePSBT={this.startParse}
-                  onStart={this.start}
-                  setError={this.reset}
-                  fileType="PSBT"
-                  validFileFormats=".psbt"
-                />
-              </Box>
-            )}
-            {this.renderInteractionMessages()}
-            {status === PENDING &&
-              !Object.values(INDIRECT_KEYSTORES).includes(keystore.type) && (
-                <Box align="center">
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={this.start}
-                  >
-                    Start Test
-                  </Button>
-                </Box>
-              )}
-            {keystore.type === HERMIT &&
-              test.interaction().workflow[0] === "request" &&
-              status === PENDING && (
-                <Box align="center">
-                  <HermitDisplayer
-                    width={400}
-                    parts={test.interaction().request()}
-                  />
-                </Box>
-              )}
-            {keystore.type === HERMIT && !this.testComplete() && (
-              <Box>
-                <HermitReader
-                  onStart={this.start}
-                  onSuccess={this.resolve}
-                  onClear={this.reset}
-                  startText="Scan QR Codes From Hermit"
-                  interaction={test.interaction()}
-                />
-              </Box>
-            )}
-            {this.testComplete() && this.renderResult()}
-
-            <TestRunNote />
-          </CardContent>
-          <CardActions>
-            {status === ACTIVE && (
-              <Button disabled>
-                <CircularProgress />
-                &nbsp; Running test...
-              </Button>
-            )}
-            {this.testComplete() && (
-              <Button variant="text" color="error" onClick={this.reset}>
-                Reset Test
-              </Button>
-            )}
-          </CardActions>
-        </Card>
-      </Box>
-    );
-  };
-
-  testComplete = () => {
-    const { status } = this.props;
+  const testComplete = () => {
     return (
       status === Test.SUCCESS ||
       status === Test.ERROR ||
@@ -214,8 +118,7 @@ Derivation: ${test.params.derivation}
     );
   };
 
-  renderInteractionMessages = () => {
-    const { status, test } = this.props;
+  const renderInteractionMessages = () => {
     if (status === PENDING || status === ACTIVE) {
       return (
         <InteractionMessages
@@ -227,8 +130,7 @@ Derivation: ${test.params.derivation}
     return null;
   };
 
-  renderResult = () => {
-    const { status, message } = this.props;
+  const renderResult = () => {
     switch (status) {
       case Test.SUCCESS:
         return (
@@ -268,43 +170,40 @@ Derivation: ${test.params.derivation}
     }
   };
 
-  start = async () => {
-    const { test, keystore, testRunIndex, startTestRun } = this.props;
-    startTestRun(testRunIndex);
+  const start = async () => {
+    dispatch(startTestRunAction(testRunIndex));
     if (keystore.type === HERMIT) {
       return;
     }
     const result = await test.run();
-    this.handleResult(result);
+    handleResult(result);
   };
 
-  startParse = async (data) => {
-    const { test, testRunIndex, startTestRun } = this.props;
-    startTestRun(testRunIndex);
+  const startParse = async (data) => {
+    dispatch(startTestRunAction(testRunIndex));
     const result = await test.runParse(data);
-    this.handleResult(result);
+    handleResult(result);
   };
 
-  resolve = (actual) => {
-    const { test } = this.props;
+  const resolve = (actual) => {
     const result = test.resolve(test.postprocess(actual));
-    this.handleResult(result);
+    handleResult(result);
   };
 
-  handleResult = (result) => {
-    const { testRunIndex, endTestRun, setErrorNotification } = this.props;
+  const handleResult = (result) => {
     if (result.status === Test.ERROR) {
-      setErrorNotification(result.message);
+      dispatch(setErrorNotificationAction(result.message));
     }
-    endTestRun(testRunIndex, result.status, this.formatMessage(result));
+    dispatch(
+      endTestRunAction(testRunIndex, result.status, formatMessage(result)),
+    );
   };
 
-  reset = () => {
-    const { testRunIndex, resetTestRun } = this.props;
-    resetTestRun(testRunIndex);
+  const reset = () => {
+    dispatch(resetTestRunAction(testRunIndex));
   };
 
-  formatMessage = (result) => {
+  const formatMessage = (result) => {
     switch (result.status) {
       case Test.FAILURE:
         return (
@@ -313,13 +212,13 @@ Derivation: ${test.params.derivation}
               <dt>Expected:</dt>
               <dd>
                 <code className="TestRun-wrap">
-                  {this.formatOutput(result.expected)}
+                  {formatOutput(result.expected)}
                 </code>
               </dd>
               <dt>Actual:</dt>
               <dd>
                 <code className="TestRun-wrap">
-                  {this.formatOutput(result.actual)}
+                  {formatOutput(result.actual)}
                 </code>
               </dd>
               {result.diff && (
@@ -327,7 +226,7 @@ Derivation: ${test.params.derivation}
                   <dt>Diff:</dt>
                   <dd>
                     <code className="TestRun-wrap">
-                      {result.diff.map(this.formatDiffSegment)}
+                      {result.diff.map(formatDiffSegment)}
                     </code>
                   </dd>
                 </div>
@@ -342,7 +241,7 @@ Derivation: ${test.params.derivation}
     }
   };
 
-  formatOutput = (output) => {
+  const formatOutput = (output) => {
     switch (typeof output) {
       case "object":
         return JSON.stringify(output);
@@ -354,18 +253,18 @@ Derivation: ${test.params.derivation}
     }
   };
 
-  formatDiffSegment = (segment, i) => {
+  const formatDiffSegment = (segment, i) => {
     return (
       <span
         key={i}
-        className={`TestRun-diff-segment-${this.diffSegmentClass(segment)}`}
+        className={`TestRun-diff-segment-${diffSegmentClass(segment)}`}
       >
         {segment.value}
       </span>
     );
   };
 
-  diffSegmentClass = (segment) => {
+  const diffSegmentClass = (segment) => {
     if (segment.added) {
       return "added";
     }
@@ -374,24 +273,110 @@ Derivation: ${test.params.derivation}
     }
     return "common";
   };
-}
 
-const mapStateToProps = (state, ownProps) => {
-  return {
-    ...{ keystore: state.keystore },
-    ...(state.testSuiteRun.testRuns[ownProps.testRunIndex] || {}),
-    ...{ testRunIndex: ownProps.testRunIndex },
-  };
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  });
+
+  if (!test) {
+    return (
+      <Box>
+        <p>No test selected.</p>
+      </Box>
+    );
+  }
+  return (
+    <Box>
+      <Card>
+        <CardHeader
+          title={test.name()}
+          subheader={`Test ${testRunIndex + 1}`}
+        />
+        <CardContent>
+          {test.description()}
+          {keystore.type === COLDCARD && !test.unsignedTransaction && (
+            <Box align="center">
+              <ColdcardJSONReader
+                interaction={test.interaction()}
+                onReceive={startParse}
+                onStart={start}
+                setError={reset}
+                isTest
+              />
+            </Box>
+          )}
+          {keystore.type === COLDCARD && test.unsignedTransaction && (
+            <Box align="center" style={{ marginTop: "2em" }}>
+              <ColdcardSigningButtons
+                handlePSBTDownloadClick={handleDownloadPSBTClick}
+                handleWalletConfigDownloadClick={
+                  handledDownloadWalletConfigClick
+                }
+              />
+              <ColdcardPSBTReader
+                interaction={test.interaction()}
+                onReceivePSBT={startParse}
+                onStart={start}
+                setError={reset}
+                fileType="PSBT"
+                validFileFormats=".psbt"
+              />
+            </Box>
+          )}
+          {renderInteractionMessages()}
+          {status === PENDING &&
+            !Object.values(INDIRECT_KEYSTORES).includes(keystore.type) && (
+              <Box align="center">
+                <Button variant="contained" color="primary" onClick={start}>
+                  Start Test
+                </Button>
+              </Box>
+            )}
+          {keystore.type === HERMIT &&
+            test.interaction().workflow[0] === "request" &&
+            status === PENDING && (
+              <Box align="center">
+                <HermitDisplayer
+                  width={400}
+                  parts={test.interaction().request()}
+                />
+              </Box>
+            )}
+          {keystore.type === HERMIT && !testComplete() && (
+            <Box>
+              <HermitReader
+                onStart={start}
+                onSuccess={resolve}
+                onClear={reset}
+                startText="Scan QR Codes From Hermit"
+                interaction={test.interaction()}
+              />
+            </Box>
+          )}
+          {testComplete() && renderResult()}
+
+          <TestRunNote />
+        </CardContent>
+        <CardActions>
+          {status === ACTIVE && (
+            <Button disabled>
+              <CircularProgress />
+              &nbsp; Running test...
+            </Button>
+          )}
+          {testComplete() && (
+            <Button variant="text" color="error" onClick={reset}>
+              Reset Test
+            </Button>
+          )}
+        </CardActions>
+      </Card>
+    </Box>
+  );
 };
 
-const mapDispatchToProps = {
-  ...testRunActions,
-  ...errorNotificationActions,
-};
-
-const TestRun = connect(mapStateToProps, mapDispatchToProps)(TestRunBase);
-
-TestRunBase.propTypes = {
+TestRun.propTypes = {
   endTestRun: PropTypes.func.isRequired,
   isLastTest: PropTypes.bool.isRequired,
   keystore: PropTypes.shape({
@@ -422,7 +407,7 @@ TestRunBase.propTypes = {
   status: PropTypes.string.isRequired,
 };
 
-TestRunBase.defaultProps = {
+TestRun.defaultProps = {
   test: {
     unsignedTransaction: null,
     params: {},

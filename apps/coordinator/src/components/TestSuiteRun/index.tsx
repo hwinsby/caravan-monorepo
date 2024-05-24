@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { connect } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 
 import { PENDING, ACTIVE } from "@caravan/wallets";
 
@@ -13,11 +13,17 @@ import {
   LinearProgress,
 } from "@mui/material";
 import { ArrowBack, ArrowForward } from "@mui/icons-material";
-import * as testSuiteRunActions from "../../actions/testSuiteRunActions";
+import {
+  startTestSuiteRun,
+  setCurrentTestRun,
+} from "../../actions/testSuiteRunActions";
 import KeystorePicker from "./KeystorePicker";
 import TestSuiteRunSummary from "./TestSuiteRunSummary";
 import TestRun from "./TestRun";
 import Seed from "./Seed";
+
+import { getTestSuiteRun } from "../../selectors/testSuiteRun";
+import { getKeystore } from "../../selectors/keystore";
 
 const SPACEBAR_CODE = "Space";
 const LEFT_ARROW_CODE = "ArrowLeft";
@@ -25,28 +31,11 @@ const UP_ARROW_CODE = "ArrowUp";
 const RIGHT_ARROW_CODE = "ArrowRight";
 const DOWN_ARROW_CODE = "ArrowDown";
 
-interface TestSuiteRunBaseProps {
-  keystore: {
-    note: string;
-    type: string;
-    status: string;
-    version: string;
-  };
-  setCurrentTestRun: (index: number) => void;
-  startTestSuiteRun: () => void;
-  testSuiteRun: {
-    currentTestRunIndex: number;
-    started: boolean;
-    testRuns: any[];
-  };
-}
+const TestSuiteRunBase = () => {
+  const keystore = useSelector(getKeystore);
+  const testSuiteRun = useSelector(getTestSuiteRun);
+  const dispatch = useDispatch();
 
-const TestSuiteRunBase = ({
-  testSuiteRun,
-  keystore,
-  setCurrentTestRun,
-  startTestSuiteRun,
-}: TestSuiteRunBaseProps) => {
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
     return () => {
@@ -103,7 +92,7 @@ const TestSuiteRunBase = ({
   };
 
   const start = () => {
-    startTestSuiteRun();
+    dispatch(startTestSuiteRun());
   };
 
   const startDisabled = () => {
@@ -129,14 +118,14 @@ const TestSuiteRunBase = ({
     if (testSuiteRun.currentTestRunIndex < 1) {
       return;
     }
-    setCurrentTestRun(testSuiteRun.currentTestRunIndex - 1);
+    dispatch(setCurrentTestRun(testSuiteRun.currentTestRunIndex - 1));
   };
 
   const nextTest = () => {
     if (testSuiteRun.currentTestRunIndex === testSuiteRun.testRuns.length - 1) {
       return;
     }
-    setCurrentTestRun(testSuiteRun.currentTestRunIndex + 1);
+    dispatch(setCurrentTestRun(testSuiteRun.currentTestRunIndex + 1));
   };
 
   const renderSetup = () => {
@@ -247,20 +236,4 @@ const TestSuiteRunBase = ({
   );
 };
 
-const mapStateToProps = (state: any) => {
-  return {
-    keystore: state.keystore,
-    testSuiteRun: state.testSuiteRun,
-  };
-};
-
-const mapDispatchToProps = {
-  ...testSuiteRunActions,
-};
-
-const TestSuiteRun = connect(
-  mapStateToProps,
-  mapDispatchToProps,
-)(TestSuiteRunBase);
-
-export default TestSuiteRun;
+export default TestSuiteRunBase;
